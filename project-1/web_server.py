@@ -47,6 +47,6 @@ while True:
         # Close client socket
         conn.close()
 
-        # Close the server socket
-        server_sock.close()
-        sys.exit() # Terminate the program after sending the corresponding data
+# Close the server socket
+server_sock.close()
+sys.exit() # Terminate the program after sending the corresponding data
