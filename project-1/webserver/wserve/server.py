@@ -1,16 +1,9 @@
 import socket
 import dataclasses
 import typing
+import urllib.parse
 
-
-@dataclasses.dataclass
-class html_request:
-    type: str
-    path: str
-    protocol: str
-    header: typing.Dict[str, str]
-    args: typing.Dict[str, str]
-    body: str
+from . import html_resp_ds
 
 
 class WebServer():
@@ -22,47 +15,17 @@ class WebServer():
         # TODO: Check func for request kwarg and mark it
         # so the code below only tries to parse request to
         # func if it's a proper argument.
-        def decorator(func):
+        def __decorator(func):
             self.routes[path] = func
             return func
-        return decorator
+        return __decorator
 
-    def receive_and_parse_request(self, conn:socket.socket):
+    def receive_and_parse_request(self, conn:socket.socket) -> typing.Union[html_resp_ds.HTMLRequest, None]:
         r = conn.recv(1024)
         if len(r) == 0:
             return None
-
         r = r.decode()
-        parts = r.split("\r\n\r\n")
-        header, body = parts
-
-        header_lines = header.split("\r\n")
-        body_lines = body.split("\r\n")
-
-        type_, path, protocol = header_lines[0].split(" ", 2)
-
-        args = {}
-        for entry in path.split("&")[1:]:
-            k, v = entry.split("=",1)
-            # TODO: Url decode v
-            args[k] = v
-        
-        path = path.split("&", 1)[0]
-
-        header_dict = {}
-        for line in header_lines[1:]:
-            if len(line) == 0:
-                continue
-            k, v = line.split(": ", 1)
-            header_dict[k] = v
-        
-        return html_request(
-            type=type_,
-            path=path,
-            protocol=protocol,
-            args=args,
-            header=header_dict,
-            body=body)
+        return html_resp_ds.HTMLRequest.from_message(r)
 
     def run(self, ip:str, port:int):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -72,23 +35,31 @@ class WebServer():
         while True:
             conn, addr = self.sock.accept()
             request = self.receive_and_parse_request(conn)
+
             if request is None:
                 continue
+            
+            print(request.type, request.path, request.args)
 
             callback = self.routes.get(request.path)
-            callback_kwargs = {
-                "request": request
-            }
+            callback_kwargs = { "request": request }
 
             if callback is not None:
-                status, result = callback(**callback_kwargs)
-                conn.send(f"HTTP/1.1 {status} OK\r\n".encode())
-                conn.send(b"Content-Type: text/html\r\n\r\n")
-                conn.send(result.encode())
+                status, callback_result = callback(**callback_kwargs)
+
+                response = html_resp_ds.HTMLResponse.basic_text_html(
+                    status_int=200,
+                    status_str="OK",
+                    content=callback_result.encode() 
+                )
+                conn.send(response.compile())
             else:
-                conn.send(b"HTTP/1.1 200 OK\r\n")
-                conn.send(b"Content-Type: text/html\r\n\r\n")
-                conn.send(f"<html><head></head><body><h1>404 Not Found</h1><p>The requested path \"{request.path}\" was not found.</p></body></html>\r\n".encode())
+                response = html_resp_ds.HTMLResponse.basic_text_html(
+                    status_int=404,
+                    status_str="Not Found",
+                    content=f"<html><head></head><body><h1>404 Not Found</h1><p>The requested path \"{request.path}\" was not found.</p></body></html>\r\n".encode()
+                )
+                conn.send(response.compile())
             conn.close()
 
 

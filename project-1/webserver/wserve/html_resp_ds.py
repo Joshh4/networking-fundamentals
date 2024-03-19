@@ -2,6 +2,12 @@
 
 import typing
 import datetime
+import urllib
+
+def get_current_gmt_time() -> str:
+    gmt_offset = datetime.timezone.utc.utcoffset(None)
+    gmt_time = datetime.datetime.now() - gmt_offset
+    date_formatted = gmt_time.strftime("%a, %d %b %Y %H:%M:%S GMT")
 
 class HTMLRequest(object):
     type:str
@@ -18,6 +24,7 @@ class HTMLRequest(object):
                  header:typing.Dict[str, str]=None,
                  args:typing.Dict[str, str]=None,
                  body:str=None):
+        self._r = ""
         self.type = type_
         self.path = path
         self.protocol = protocol
@@ -41,8 +48,7 @@ class HTMLRequest(object):
         args = {}
         for entry in path.split("&")[1:]:
             k, v = entry.split("=",1)
-            # TODO: Url decode v
-            args[k] = v
+            args[k] = urllib.parse.unquote(v)
         
         path = path.split("&", 1)[0]
 
@@ -53,69 +59,58 @@ class HTMLRequest(object):
             k, v = line.split(": ", 1)
             header_dict[k] = v
         
-        return HTMLRequest(
+        req = HTMLRequest(
             type_=type_,
             path=path,
             protocol=protocol,
             header=header_dict,
             args=args,
             body=body)
+        req._r = r
+        
+        return req
     
     @staticmethod
     def from_values(*args, **kwargs):
         return HTMLRequest(*args, **kwargs)
 
 class HTMLResponse(object):
-    def __init__(self,
-                 status_int:int,
-                 status_str:str,
-                 date:datetime.datetime,
-                 connection_type:str,
-                 keep_alive:str,
-                 content_encoding:str,
-                 content_type:str,
-                 last_modified:datetime.datetime,
-                 body:str):
-        self.status_int:int = status_int
-        self.status_str:str = status_str
-        self.date:datetime.datetime = date
-        self.connection_type:str = connection_type
-        self.keep_alive:str = keep_alive
-        self.content_encoding:str = content_encoding
-        self.content_type:str = content_type
-        self.last_modified:datetime.datetime = last_modified
-        self.body:str = body
+    header:typing.Dict[str, str]
+    content:bytes
+
+    def __init__(
+            self,
+            protocol:str,
+            status_int:int,
+            status_str:str,
+            header:typing.Dict[str,str],
+            content:bytes):
+        self.protocol = protocol
+        self.status_int = status_int
+        self.status_str = status_str
+        self.header = header
+        self.content = content
     
     def compile(self) -> bytes:
-        s = ""
-
-        s += f"{self.status_int} {self.status_str}\r\n"
-        s += f"Connection: {self.connection_type}\r\n"
-        s += f"Content-Type: {self.content_type}\r\n"
-        s += f"Content-Length: {len(self.body)}\r\n"
-        s += f"Date: {...}\r\n"
-
-        # TODO:
-        # Format date
-
-
-        '''
-        from datetime import datetime, timezone, timedelta
-
-        # Get the current time in local timezone
-        local_time = datetime.now()
-
-        # Convert local time to GMT (UTC)
-        gmt_offset = timezone.utc.utcoffset(None)
-        gmt_time = local_time - gmt_offset
-
-        # Format the GMT time
-        formatted_date = gmt_time.strftime('%a, %d %b %Y %H:%M:%S GMT')
-
-        print(formatted_date)'''
-
-        s += "\r\n"
-
-        s += self.body+"\r\n"
-
-        return s.encode()
+        s = f"{self.protocol} {self.status_int} {self.status_str}\r\n".encode()
+        for k,v in self.header.items():
+            s += f"{k}: {v}\r\n".encode()
+        s += b"\r\n"
+        if len(self.content) > 0:
+            s += self.content
+            s += b"\r\n"
+        return s
+    
+    @staticmethod
+    def basic_text_html(
+            status_int:int,
+            status_str:str,
+            content:bytes,
+            content_type="text/html; charset=utf-8"):
+        header = {}
+        header["Connection"] = "close"
+        header["Content-Type"] = content_type
+        header["Date"] = get_current_gmt_time()
+        if len(content) > 0:
+            header["Content-Length"] = len(content)
+        return HTMLResponse("HTTP/1.1", status_int, status_str, header, content)
