@@ -39,21 +39,40 @@ class WebServer():
             if request is None:
                 continue
             
+            print(request._r)
             print(request.type, request.path, request.args)
 
-            callback = self.routes.get(request.path)
-            callback_kwargs = { "request": request }
+            sec_fetch_dest = request.header.get("Sec-Fetch-Dest")
+            display_404 = False
 
-            if callback is not None:
-                status, callback_result = callback(**callback_kwargs)
+            if sec_fetch_dest == "document":
+                callback = self.routes.get(request.path)
+                callback_kwargs = { "request": request }
 
-                response = html_resp_ds.HTMLResponse.basic_text_html(
-                    status_int=200,
-                    status_str="OK",
-                    content=callback_result.encode() 
+                if callback is not None:
+                    status, callback_result = callback(**callback_kwargs)
+
+                    response = html_resp_ds.HTMLResponse.basic_text_html(
+                        status_int=200,
+                        status_str="OK",
+                        content=callback_result.encode() 
+                    )
+                    conn.send(response.compile())
+                
+                else:
+                    display_404 = True
+            
+            elif sec_fetch_dest == "image":
+                with open(request.path[1:], "rb") as buffer:
+                    content = buffer.read()
+
+                response = html_resp_ds.HTMLResponse.image(
+                    status_int=200, status_str="OK",
+                    image_format="jpg", content=content
                 )
                 conn.send(response.compile())
-            else:
+            
+            if display_404:
                 response = html_resp_ds.HTMLResponse.basic_text_html(
                     status_int=404,
                     status_str="Not Found",

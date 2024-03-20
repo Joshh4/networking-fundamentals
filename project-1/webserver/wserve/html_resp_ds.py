@@ -73,6 +73,12 @@ class HTMLRequest(object):
     @staticmethod
     def from_values(*args, **kwargs):
         return HTMLRequest(*args, **kwargs)
+    
+    def get_accept_types(self) -> typing.List[str]:
+        accept_ = self.header.get("Accept")
+        if accept_ is None:
+            return []
+        return accept_.split(";",1)[0].split(",")
 
 class HTMLResponse(object):
     header:typing.Dict[str, str]
@@ -113,4 +119,17 @@ class HTMLResponse(object):
         header["Date"] = get_current_gmt_time()
         if len(content) > 0:
             header["Content-Length"] = len(content)
+        return HTMLResponse("HTTP/1.1", status_int, status_str, header, content)
+    
+    @staticmethod
+    def image(
+            status_int:int,
+            status_str:str,
+            image_format:str,
+            content:bytes):
+        header = {}
+        header["Connection"] = "close"
+        header["Content-Type"] = "image/"+image_format
+        header["Date"] = get_current_gmt_time()
+        header["Content-Length"] = len(content)
         return HTMLResponse("HTTP/1.1", status_int, status_str, header, content)
