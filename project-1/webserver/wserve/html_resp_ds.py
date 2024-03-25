@@ -2,7 +2,7 @@
 
 import typing
 import datetime
-import urllib
+import urllib.parse
 
 def get_current_gmt_time() -> str:
     gmt_offset = datetime.timezone.utc.utcoffset(None)
@@ -108,7 +108,7 @@ class HTMLResponse(object):
         return s
     
     @staticmethod
-    def basic_text_html(
+    def text_html(
             status_int:int,
             status_str:str,
             content:bytes,
