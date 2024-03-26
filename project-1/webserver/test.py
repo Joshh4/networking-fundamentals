@@ -19,7 +19,7 @@ def page_args(request:wserve.HTMLRequest):
 
 @ws.route("/birch")
 def page_birch(request:wserve.HTMLRequest):
-    return 200, renderer.render("birch.html")
+    return 200, renderer.render("birch.html", example_value="replaced")
 
 print("Running WebServer on port 3882")
 

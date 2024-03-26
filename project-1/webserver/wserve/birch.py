@@ -25,7 +25,7 @@ class BirchRenderer(object):
         """
         self.global_scope[key] = value
     
-    def render(self, filepath:str) -> str:
+    def render(self, filepath:str, **scope) -> str:
         """Renders an HTML file.
         Raises OSError if file cannot be read.
 
@@ -54,7 +54,8 @@ class BirchRenderer(object):
             match = file_content[span[0]:span[1]]
             match_content = match[2:-2].strip()
 
-            match_result = str(self.global_scope.get(match_content, "Undefined"))
+            scope_value = scope.get(match_content, self.global_scope.get(match_content, "Undefined"))
+            match_result = str(scope_value)
 
             # Replace the portion of the string
             file_content = file_content[:span[0]] + match_result + file_content[span[1]:]
