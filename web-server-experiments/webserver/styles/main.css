@@ -1,0 +1,8 @@
+div.padded-horizontal {
+    padding: 0 20%;
+    width: auto;
+}
+
+div.spacer-sm {
+    height: 20px;
+}
